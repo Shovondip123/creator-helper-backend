@@ -96,9 +96,9 @@ shortsIdeas (array of 3 strings).
 Do not use markdown fences.`;
 
   const models = [
-    GEMINI_MODEL,
-    'gemini-2.5-flash'
-  ];
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite'
+];
 
   let lastError;
 
