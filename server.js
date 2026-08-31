@@ -66,27 +66,100 @@ function ensureUser(db,uid,profile={}){ if(!db.users[uid]) db.users[uid]={credit
 function validateInput(body){for(const f of ['topic','platform','format','language','tone'])if(!body?.[f]||typeof body[f]!=='string')return`Missing field: ${f}`;if(body.topic.trim().length<3||body.topic.length>1000)return'Topic must be between 3 and 1000 characters.';return null;}
 function demoContent(input){const t=input.topic.trim();return{titles:[`5 AI Tools Every Student Should Know in 2026`,`These 5 AI Tools Will Make Students Study Smarter`,`5 Game-Changing AI Tools for Students`,`Study Smarter: 5 AI Tools You Need to Try`,`The 5 Most Useful AI Tools for Students`,`Stop Studying the Hard Way: Try These 5 AI Tools`,`5 AI Tools That Can Save Students Hours Every Week`,`Students Need These 5 AI Tools Right Now`,`I Tested 5 AI Tools for Students — Here Are the Best`,`5 Powerful AI Tools to Level Up Your Student Life`],hooks:[`What if AI could save you hours of study time every single week?`,`Most students are using AI the wrong way. Here are 5 tools that actually help.`,`Before your next study session, check out these five AI tools.`,`These tools can turn a messy study routine into a much smarter workflow.`,`If you're a student in 2026, you should know about these AI tools.`],description:`In this video, we explore ${t} and show how these tools can help students study smarter, save time, organize information and improve productivity.`,keywords:`AI tools for students, artificial intelligence, student productivity, study tools, AI study tools, education technology, productivity tools, student life, study smarter, AI apps, ${t}`,hashtags:`#AITools #Students #StudySmarter #AI #Productivity #Education #StudentLife #Tech`,thumbnailTexts:[`5 AI TOOLS`,`STUDY SMARTER`,`AI EVERY STUDENT NEEDS`,`SAVE HOURS WITH AI`,`TOP AI TOOLS 2026`],cta:`If you found this useful, subscribe and follow for more practical AI tools and productivity tips.`,socialCaption:`Want to study smarter? 🚀 Here are 5 AI tools students should know about in 2026. Save this post and share it with a student who needs it.`,shortsIdeas:[`30-second countdown: 3 AI tools every student should try`,`Before vs. after: studying with AI`,`One AI tool, one student problem, one quick solution`]};}
 
-async function callGemini(input){
-  if(!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured on the backend.');
-  const ai=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});
-
-  const prompt=`Create a high-quality content pack for a creator.\nTopic: ${input.topic}\nPlatform: ${input.platform}\nFormat: ${input.format}\nLanguage: ${input.language}\nTone: ${input.tone}\nReturn ONLY valid JSON, with exactly these keys: titles (array of 10 strings), hooks (array of 5 strings), description (string), keywords (string), hashtags (string), thumbnailTexts (array of 5 strings), cta (string), socialCaption (string), shortsIdeas (array of 3 strings). Do not use markdown fences.`;
-
-  const response = await ai.models.generateContent({
-    model: GEMINI_MODEL,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json"
-    }
-  });
-
-  const text = String(response.text || '').trim();
-
-  if(!text){
-    throw new Error('Gemini returned no text.');
+async function callGemini(input) {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY is not configured on the backend.');
   }
 
-  return JSON.parse(text);
+  const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY
+  });
+
+  const prompt = `Create a high-quality content pack for a creator.
+Topic: ${input.topic}
+Platform: ${input.platform}
+Format: ${input.format}
+Language: ${input.language}
+Tone: ${input.tone}
+
+Return ONLY valid JSON with exactly these keys:
+titles (array of 10 strings),
+hooks (array of 5 strings),
+description (string),
+keywords (string),
+hashtags (string),
+thumbnailTexts (array of 5 strings),
+cta (string),
+socialCaption (string),
+shortsIdeas (array of 3 strings).
+
+Do not use markdown fences.`;
+
+  const models = [
+    GEMINI_MODEL,
+    'gemini-2.5-flash'
+  ];
+
+  let lastError;
+
+  for (const model of [...new Set(models)]) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(
+          `Trying Gemini model: ${model}, attempt: ${attempt}`
+        );
+
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json'
+          }
+        });
+
+        const text = String(response.text || '').trim();
+
+        if (!text) {
+          throw new Error('Gemini returned no text.');
+        }
+
+        return JSON.parse(text);
+
+      } catch (error) {
+        lastError = error;
+
+        const status = Number(
+          error?.status ||
+          error?.code ||
+          error?.error?.code ||
+          0
+        );
+
+        console.error(
+          `Gemini ${model} attempt ${attempt} failed:`,
+          error?.message || error
+        );
+
+        if (status !== 503 && status !== 429) {
+          throw error;
+        }
+
+        if (attempt < 3) {
+          await new Promise(resolve =>
+            setTimeout(resolve, attempt * 3000)
+          );
+        }
+      }
+    }
+
+    console.log(`Switching Gemini model after failures: ${model}`);
+  }
+
+  throw new Error(
+    `All Gemini models are temporarily unavailable. Last error: ${
+      lastError?.message || 'Unknown error'
+    }`
+  );
 }
 async function authMiddleware(req,res,next){
   if(!firebaseReady)return res.status(503).json({error:'Firebase backend authentication is not configured yet.'});
