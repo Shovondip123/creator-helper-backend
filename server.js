@@ -69,13 +69,25 @@ function demoContent(input){const t=input.topic.trim();return{titles:[`5 AI Tool
 async function callGemini(input){
   if(!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured on the backend.');
   const ai=new GoogleGenAI({apiKey:process.env.GEMINI_API_KEY});
+
   const prompt=`Create a high-quality content pack for a creator.\nTopic: ${input.topic}\nPlatform: ${input.platform}\nFormat: ${input.format}\nLanguage: ${input.language}\nTone: ${input.tone}\nReturn ONLY valid JSON, with exactly these keys: titles (array of 10 strings), hooks (array of 5 strings), description (string), keywords (string), hashtags (string), thumbnailTexts (array of 5 strings), cta (string), socialCaption (string), shortsIdeas (array of 3 strings). Do not use markdown fences.`;
-  const interaction=await ai.interactions.create({model:GEMINI_MODEL,input:prompt});
-  const text=String(interaction.output_text||'').trim().replace(/^```json\s*/i,'').replace(/```$/,'').trim();
-  if(!text)throw new Error('Gemini returned no text.');
+
+  const response = await ai.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json"
+    }
+  });
+
+  const text = String(response.text || '').trim();
+
+  if(!text){
+    throw new Error('Gemini returned no text.');
+  }
+
   return JSON.parse(text);
 }
-
 async function authMiddleware(req,res,next){
   if(!firebaseReady)return res.status(503).json({error:'Firebase backend authentication is not configured yet.'});
   const header=String(req.headers.authorization||''); const token=header.startsWith('Bearer ')?header.slice(7):'';
