@@ -32,6 +32,20 @@ let adminKey = '';
 let firebaseReady = false;
 let firebaseInitError = '';
 
+const PACKAGE_RULES = Object.freeze({
+  Starter: 110,
+  Creator: 300,
+  Pro: 700
+});
+
+function normalizePackageName(packageName) {
+  const name = String(packageName || '').trim().toLowerCase();
+  if (name === 'starter') return 'Starter';
+  if (name === 'creator') return 'Creator';
+  if (name === 'pro') return 'Pro';
+  return '';
+}
+
 async function getOrCreateAdminKey() {
   const envKey = String(process.env.ADMIN_KEY || '').trim();
   if (envKey) return envKey;
