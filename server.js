@@ -136,8 +136,7 @@ shortsIdeas (array of 3 strings).
 
 Do not use markdown fences.`;
 
-  const models = [
-  GEMINI_MODEL,
+ const models = [
   'gemini-3.6-flash',
 ];
 
